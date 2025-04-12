@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-mongoose.connect('mongodb://localhost:27017/DB_NodeAngular')
+mongoose.connect('mongodb://localhost:27017/TEST')
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.log(err));
 
@@ -14,6 +14,8 @@ var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var categoriesRouter = require('./routes/categories');
 var productsRouter = require('./routes/products');
+var subCategoriesRouter = require('./routes/subCategoriesRoutes');
+
 
 var app = express();
 
@@ -33,6 +35,7 @@ app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/categories', categoriesRouter);
 app.use('/products', productsRouter);
+app.use('/subCategories', subCategoriesRouter);
 
 
 // catch 404 and forward to error handler

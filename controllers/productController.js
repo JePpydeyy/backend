@@ -1,133 +1,130 @@
-//chèn multer để upload file
+const mongoose = require('mongoose'); // Thêm dòng import mongoose
 const multer = require('multer');
-const storage = multer.diskStorage({
-  destination: function(req, file, cb){
-    cb(null, './public/images')
-  },
-  filename: function(req, file, cb){
-    cb(null, file.originalname)
-  }
-})
-const checkfile = (req, file, cb) => {
-  if(!file.originalname.match(/\.(jpg|jpeg|png|gif|webp)$/)){
-    return cb(new Error('Bạn chỉ được upload file ảnh'))
-  }
-  return cb(null, true)
-}
-const upload = multer({storage: storage, fileFilter: checkfile})
-
-const categories = require('../models/categoryModel');
 const products = require('../models/productModel');
+const categories = require('../models/categoryModel');
+const sub_categories = require('../models/subCategoryModel');
 
-const getAllProducts = async (req, res) => {
-    try {
-        const { name, idcate, limit, sort, page, hot } = req.query;
-        
-        let query = {}; // Query chứa điều kiện tìm kiếm
-        let options = {}; // Các tùy chọn gồm limit và sort,...
+// Multer config
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, './public/images'),
+  filename: (req, file, cb) => cb(null, file.originalname)
+});
 
-        if (name) {  // Tìm kiếm theo tên sản phẩm, chữ i ko cần phân biệt hoa thường
-            query.name = new RegExp(name, 'i'); 
-        }
-   
-        if (hot) { // Tìm sản phẩm hot
-            query.hot = parseInt(hot);
-        }
-
-        if (idcate) { // Tìm kiếm theo ID danh mục
-            query.categoryId = idcate;
-        }
-
-        if (limit) {  // Giới hạn số lượng sản phẩm trả về
-            options.limit = parseInt(limit);
-        }
-
-        if (sort) { // Sắp xếp theo giá
-            options.sort = { price: sort === 'asc' ? 1 : -1 };
-            // 'asc' cho sắp xếp tăng dần, 'desc' cho giảm dần
-            console.log(options);
-        }
-        
-        if (page) { // Phân trang
-            options.skip = (parseInt(page) - 1) * options.limit; 
-            //skip: bỏ qua bao nhiêu document
-        }
-
-        const arr = await products.find(query, null, options).populate('categoryId', 'name');
-        res.json(arr);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
-    }
-}
-
-const getProductById = async (req, res) => {
-    try {
-        const product = await products.findById(req.params.id);
-        res.json(product);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
-    }
-}
-
-//Thêm sản phẩm
-const addPro =[upload.single('img'), async (req, res) => {
-    try {
-        //Lấy dữ liệu từ form gửi tới
-        const product= req.body;
-        //Lẩy tên ảnh từ file ảnh gửi đến
-        product.img = req.file.originalname;
-        console.log(product);
-        //Tạo 1 instance của productModel
-        const newProduct= new products(product);
-        //kiểm tra iddanh mục có tồn tại ko 
-        const category = await categories.findById(product.categoryId);
-        if(!category){
-            throw new Error('Danh mục ko tồn tại')
-        }
-        //Lưu vào database 
-        const data= await newProduct.save();
-        res.json(data);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
-    }
-}
-]
-
-//Sửa sản phẩm
-const editPro =[upload.single('img'), async (req, res) => {
-    try {
-        const product= req.body;
-        if(req.file){
-              product.img = req.file.originalname;
-        }
-        const category = await categories.findById(product.categoryId);
-        if(!category){
-            throw new Error('Danh mục ko tồn tại')
-        }
-        const data= await products.findByIdAndUpdate(
-            req.params.id,product,{new:true}
-        )
-        res.json(data);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
-    }
-}]
-
-//Xóa sản phẩm
-const deletePro = async (req, res) => {
-    try {
-        const data= await products.findByIdAndDelete(req.params.id);
-        res.json(data);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
-    }
-}
-
-module.exports = {
-    getAllProducts, getProductById,addPro,editPro,deletePro
+const checkfile = (req, file, cb) => {
+  if (!file.originalname.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+    return cb(new Error('Bạn chỉ được upload file ảnh'));
+  }
+  return cb(null, true);
 };
+
+const upload = multer({ storage, fileFilter: checkfile });
+
+// GET ALL
+const getAllProducts = async (req, res) => {
+  try {
+    const arr = await products.find().populate({
+      path: 'sub_category', // Sửa lại để populate đúng với trường sub_category
+      populate: {
+        path: 'category',
+        model: 'categories',
+        select: 'name'
+      }
+    });
+    res.json(arr);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET BY ID
+const getProductById = async (req, res) => {
+  try {
+    const productId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: 'ID không hợp lệ' });
+    }
+
+    const product = await products.findById(productId)
+      .populate({
+        path: 'sub_category',
+        populate: {
+          path: 'category',
+          model: 'categories',
+          select: 'name'
+        }
+      });
+
+    if (!product) {
+      return res.status(404).json({ message: 'Sản phẩm không tìm thấy' });
+    }
+
+    res.json(product);
+  } catch (error) {
+    console.error("Lỗi khi lấy sản phẩm: ", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+// ADD
+const addPro = [
+  upload.array('images', 5),
+  async (req, res) => {
+    try {
+      const body = req.body;
+      body.images = req.files.map(file => file.originalname);
+
+      // Kiểm tra sub_category có tồn tại không
+      const sub = await sub_categories.findById(body.sub_category_id);
+      if (!sub) throw new Error('Sub-category không tồn tại');
+
+      body.sub_category = sub._id; // Lưu ObjectId của sub_category
+
+      const newProduct = new products(body);
+      const saved = await newProduct.save();
+      res.json(saved);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+];
+
+// UPDATE
+const editPro = [
+  upload.array('images', 5),
+  async (req, res) => {
+    try {
+      const body = req.body;
+      if (req.files.length > 0) {
+        body.images = req.files.map(file => file.originalname);
+      }
+
+      const sub = await sub_categories.findById(body.sub_category_id);
+      if (!sub) throw new Error('Sub-category không tồn tại');
+
+      body.sub_category = {
+        _id: sub._id,
+        name: sub.name,
+        category: sub.category
+      };
+
+      const updated = await products.findByIdAndUpdate(req.params.id, body, { new: true });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+];
+
+// DELETE
+const deletePro = async (req, res) => {
+  try {
+    const deleted = await products.findByIdAndDelete(req.params.id);
+    res.json(deleted);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getAllProducts, getProductById, addPro, editPro, deletePro };

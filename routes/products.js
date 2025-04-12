@@ -1,23 +1,14 @@
-var express = require('express');
-var router = express.Router();
+const express = require('express');
+const router = express.Router();
+const productCtrl = require('../controllers/productController');
 
-const { getAllProducts, getProductById,addPro,editPro,deletePro } =
-require('../controllers/productController');
+// Các route để lấy sản phẩm
+router.get('/', productCtrl.getAllProducts);  // Route lấy tất cả sản phẩm
+router.get('/:id', productCtrl.getProductById);  // Route lấy sản phẩm theo ID
 
-const {verifyToken, verifyAdmin} = require('../controllers/userController');
-//Lấy tất cả sản phẩm
-router.get('/', getAllProducts);
-
-//Lấy chi tiết 1 sản phẩm
-router.get('/:id', getProductById);
-
-//Thêm sản phẩm
-router.post('/', verifyToken, verifyAdmin, addPro);
-
-//Sửa sản phẩm
-router.patch('/:id', verifyToken, verifyAdmin, editPro);
-
-//Xóa sản phẩm
-router.delete('/:id', verifyToken, verifyAdmin, deletePro);
+// Các route để thêm, sửa, xóa sản phẩm
+router.post('/', productCtrl.addPro);
+router.put('/:id', productCtrl.editPro);
+router.delete('/:id', productCtrl.deletePro);
 
 module.exports = router;
